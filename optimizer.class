@@ -1,0 +1,274 @@
+<?
+class Optimizer {
+  const ACTION_RESIZE = 1;
+  const ACTION_RESIZE_BY_WIDTH = 2;
+  const ACTION_RESIZE_BY_HEIGHT = 3;
+  const ACTION_INSCRIBE = 4;
+
+  private $optPathToCache = "cache";
+  private $optDebugMode = false;
+  private $optQuality = 60;
+  private $imgWidth = 0;
+  private $imgHeight = 0;
+  private $imgSrc = "";
+  private $imgHash = "";
+  private $imgAction;
+  // shaper needs
+  private $srcImg;
+  private $dstImg;
+  private $srcWidth;
+  private $srcHeight;
+  private $srcRatio;
+  private $srcMime;
+  private $backgroundR = 0;
+  private $backgroundG = 0;
+  private $backgroundB = 0;
+
+
+  /** CONSTRUCTOR **/
+  function __construct() {
+
+  }
+
+  /******************************************************************************************
+   *                                    PRIVATE                                             *
+   ******************************************************************************************/
+
+  /** Debug message **/
+  function debugMsg($msg, $die = false) {
+    if ( $this->optDebugMode ) {
+      echo "[".date("H:i:s")."] ";
+      echo $msg;
+      echo "<br>";
+    }
+    if ($die) die();
+  }
+
+  /********************************************* CACHER *********************************************/
+
+  /*** Search local image ***/
+  function isLocalCopy() {
+    if ( file_exists($this->optPathToCache."/".$this->imgHash) ) {
+      $this->debugMsg("Локальная копия найдена");
+      return true;
+    } else {
+      $this->debugMsg("Локальная копия не найдена");
+      return false;
+    }
+  }
+
+  /*** Download file ***/
+  function downloadFile() {
+    $imageContent = file_get_contents( $this->imgSrc );
+    $pathToPut = $this->optPathToCache."/".$this->imgHash;
+    file_put_contents( $pathToPut, $imageContent );
+    // Стоит проверять, скачался ли файл, но что делать потом? Возможно, стоит сделать в виде опции кол-во попыток на скачивание
+  }
+
+  /********************************************* SHAPER *********************************************/
+
+  /*** Get src params ***/
+  function getSrcParams() {
+    try {
+      $params = getimagesize($this->imgSrc);
+    } catch(Exception $e) {
+      $this->debugMsg("Исключение: ".$e->getMessage());
+    }
+    $this->srcWidth = $params[0];
+    $this->srcHeight = $params[1];
+    $this->srcMime = $params['mime'];
+    $this->srcRatio = round( $this->srcWidth / $this->srcHeight, 2 );
+  }
+
+  /*** Open files ***/
+  function beforeImgTransform() {
+    switch ($this->srcMime) {
+      case "image/jpeg" : $this->srcImg = imagecreatefromjpeg($this->imgSrc); break;
+      case "image/png" : $this->srcImg = imagecreatefrompng($this->imgSrc); break;
+      case "image/gif" : $this->srcImg = imagecreatefromgif($this->imgSrc); break;
+      default: throw new Exception("Mime не определен. Файл не может быть открыт");
+    }
+    $this->dstImg = imagecreatetruecolor($this->imgWidth, $this->imgHeight);
+    $backgroundColor = imagecolorallocate ( $this->dstImg, $this->backgroundR, $this->backgroundG, $this->backgroundB );
+    imagefill( $this->dstImg, 0, 0, $backgroundColor );
+  }
+
+  /*** Save files ***/
+  function afterImgTransform() {
+    switch ($this->srcMime) {
+      case "image/jpeg" : imagejpeg( $this->dstImg, $this->imgSrc, $this->optQuality );break;
+      case "image/png" : imagepng( $this->dstImg, $this->imgSrc );break;
+      case "image/gif" : imagegif( $this->dstImg, $this->imgSrc );break;
+      default: throw new Exception("Файл не пересохранен");
+    }
+    imagedestroy($this->srcImg);
+    imagedestroy($this->dstImg);
+  }
+
+
+  /*** resize ***/
+  function resize() {
+    $this->debugMsg("Масштабирование изображения");
+    $this->getSrcParams();
+    $this->beforeImgTransform();
+    imagecopyresampled($this->dstImg, $this->srcImg, 0, 0, 0, 0, $this->imgWidth, $this->imgHeight, $this->srcWidth, $this->srcHeight);
+    $this->afterImgTransform();
+  }
+
+  /*** Resize by width ***/
+  function resizeByWidth() {
+    $this->debugMsg("Масштабирование изображения (по ширине)");
+    $this->getSrcParams();
+    $this->imgHeight = $this->imgWidth / $this->srcRatio;
+    $this->beforeImgTransform();
+    imagecopyresampled($this->dstImg, $this->srcImg, 0, 0, 0, 0, $this->imgWidth, $this->imgHeight, $this->srcWidth, $this->srcHeight);
+    $this->afterImgTransform();
+  }
+
+  /*** Resize by height ***/
+  function resizeByHeight() {
+    $this->debugMsg("Масштабирование изображения (по высоте)");
+    $this->getSrcParams();
+    $this->imgWidth = $this->imgHeight * $this->srcRatio;
+    $this->beforeImgTransform();
+    imagecopyresampled($this->dstImg, $this->srcImg, 0, 0, 0, 0, $this->imgWidth, $this->imgHeight, $this->srcWidth, $this->srcHeight);
+    $this->afterImgTransform();
+  }
+
+  /*** Inscribe ***/
+  function inscribe() {
+    $this->debugMsg("Масштабирование изображения");
+    $this->getSrcParams();
+    $this->beforeImgTransform();
+    if ( $this->imgWidth > $this->imgHeight ) {
+      $smartHeight = $this->imgHeight;
+      $smartWidth = $smartHeight * $this->srcRatio;
+      $diff = (int)($this->imgWidth - $smartWidth) / 2;
+      imagecopyresampled ($this->dstImg, $this->srcImg, $diff, 0, 0, 0, $smartWidth, $smartHeight, $this->srcWidth, $this->srcHeight);
+    } else {
+      $smartWidth = $this->imgWidth;
+      $smartHeight = $smartWidth / $this->srcRatio;
+      $diff = (int)($this->imgHeight - $smartHeight) / 2;
+      imagecopyresampled ($this->dstImg, $this->srcImg, 0, $diff, 0, 0, $smartWidth, $smartHeight, $this->srcWidth, $this->srcHeight);
+    }
+    $this->afterImgTransform();
+  }
+
+  /********************************************* WATERMARKER *********************************************/
+
+  function textWatermark($text) {
+    $this->debugMsg("Нанесение текстовой вотермарки");
+    $this->getSrcParams();
+    $this->beforeImgTransform();
+    /* это небольшой костыль, надо бы переписать */
+    imagedestroy($this->dstImg);
+    $this->dstImg = imagecreatetruecolor($this->srcWidth, $this->srcHeight);
+    /* **** */
+    imagecopyresampled($this->dstImg, $this->srcImg, 0, 0, 0, 0, $this->srcWidth, $this->srcHeight, $this->srcWidth, $this->srcHeight);
+    $textColor = imagecolorallocate($this->dstImg, 255, 255, 255);
+    imagestring($this->dstImg, 2, 5, $this->srcHeight - 15, $text, $textColor);
+    $this->afterImgTransform();
+  }
+
+
+  /******************************************************************************************
+   *                                         PUBLIC                                         *
+   ******************************************************************************************/
+
+  /*** Cache & shape ***/
+  public function cacheAndShape($src = "", $width = "", $height = "", $action = "") {
+    if (!empty($src)) $this->setSrc($src);
+    if (!empty($width)) $this->setWidth($width);
+    if (!empty($height)) $this->setHeight($height);
+    if (!empty($action)) $this->setAction($action);
+    if ( empty($this->imgWidth) || empty($this->imgHeight) || empty($this->imgSrc) || empty($this->imgAction) )
+      throw new Exception('Cache&Shape: не достаточно параметров');
+    $this->imgHash = md5($this->imgSrc.$this->imgWidth.$this->imgHeight.$this->imgAction.$this->optQuality);
+    if ( !$this->isLocalCopy() ) {
+     $this->downloadFile();
+     $this->shape($this->optPathToCache."/".$this->imgHash);
+    }
+    return $this->imgHash;
+  }
+
+
+  /*** Set background color ***/
+  public function setBackgroundColor($r, $g, $b) {
+    if ($r < 0 || $r > 255) $r = 0;
+    if ($g < 0 || $g > 255) $g = 0;
+    if ($b < 0 || $b > 255) $b = 0;
+    $this->backgroundR = $r;
+    $this->backgroundG = $g;
+    $this->backgroundB = $b;
+    $this->debugMsg("Фон установлен в: ".$r." ".$g." ".$b);
+  }
+
+  /*** Put watermark ***/
+  public function putWatermark($text, $src = "") {
+    if (!empty($src)) $this->setSrc($src);
+    if (empty($this->imgSrc)) throw new Exception('Watermarker: Не указан путь к изображению');
+    $this->textWatermark($text);
+  }
+
+  /*** Shape image ***/
+  public function shape($src = "", $width = "", $height = "", $action = "") {
+    if (!empty($src)) $this->setSrc($src);
+    if (!empty($width)) $this->setWidth($width);
+    if (!empty($height)) $this->setHeight($height);
+    if (!empty($action)) $this->setAction($action);
+    if ( empty($this->imgWidth) || empty($this->imgHeight) || empty($this->imgSrc) || empty($this->imgAction) )
+      throw new Exception('Shaper: не достаточно параметров');
+    switch ( $this->imgAction ) {
+      case self::ACTION_RESIZE: $this->resize(); break;
+      case self::ACTION_RESIZE_BY_WIDTH: $this->resizeByWidth(); break;
+      case self::ACTION_RESIZE_BY_HEIGHT: $this->resizeByHeight(); break;
+      case self::ACTION_INSCRIBE: $this->inscribe(); break;
+      default: break;
+    }
+  }
+
+  /*** Cache image ***/
+  public function cache($src = "") {
+    $this->debugMsg("call by: ".__METHOD__);
+    if (!empty($src)) $this->setSrc($src);
+    if (empty($this->imgSrc)) throw new Exception('Cacher: Не указан путь к изображению');
+    $this->imgHash = md5($this->imgSrc);
+    if ( !$this->isLocalCopy() ) $this->downloadFile();
+    return $this->imgHash;
+  }
+
+  /*** Set action ***/
+  public function setAction($action) {
+    $this->imgAction = (int)$action;
+    $this->debugMsg("Указано действие: {$this->imgAction}");
+  }
+
+  /*** Set path to image ***/
+  public function setSrc($src) {
+    $this->imgSrc = $src;
+    $this->debugMsg("Путь к файлу указан: {$this->imgSrc}");
+  }
+
+  /*** Set width for output image ***/
+  public function setWidth($width) {
+    if ($width < 10) throw new Exception('Слишком маленькая высота');
+    $this->imgWidth = (int)$width;
+    $this->debugMsg("Ширина установлена: {$this->imgWidth}");
+  }
+
+  /*** Set height for output image ***/
+  public function setHeight($height) {
+    if ($height < 10) throw new Exception('Слишком маленькая ширина');
+    $this->imgHeight = (int)$height;
+    $this->debugMsg("Высота установлена: {$this->imgHeight}");
+  }
+
+  /*** Set quality for output image ***/
+  public function setQuality($quality) {
+    if ($quality < 10 || $quality > 100) throw new Exception('Неверно задано качество');
+    $this->optQuality = (int)$quality;
+    $this->debugMsg("Качество установлена: {$this->optQuality}");
+  }
+
+}
+?>
