@@ -4,6 +4,7 @@ class Optimizer {
   const ACTION_RESIZE_BY_WIDTH = 2;
   const ACTION_RESIZE_BY_HEIGHT = 3;
   const ACTION_INSCRIBE = 4;
+  const ACTION_CROP_BY_WIDTH = 5;
 
   private $optPathToCache = "cache";
   private $optDebugMode = false;
@@ -154,6 +155,19 @@ class Optimizer {
     $this->afterImgTransform();
   }
 
+  /*** Crop By Width ***/
+  function cropByWidth() {
+    $this->debugMsg("Вписывание с обрезанием по ширине");
+    $this->getSrcParams();
+    $finalHeight = round($this->imgWidth / $this->srcRatio);
+    $diff = round( ($this->imgHeight - $finalHeight) / 2 );
+    $this->debugMsg("finalH = ".$finalHeight);
+    $this->debugMsg("diff = ".$diff);
+    $this->beforeImgTransform();
+    imagecopyresampled($this->dstImg, $this->srcImg, 0, $diff, 0, 0, $this->imgWidth, $finalHeight, $this->srcWidth, $this->srcHeight);
+    $this->afterImgTransform();
+  }
+
   /********************************************* WATERMARKER *********************************************/
 
   function textWatermark($text) {
@@ -223,6 +237,7 @@ class Optimizer {
       case self::ACTION_RESIZE_BY_WIDTH: $this->resizeByWidth(); break;
       case self::ACTION_RESIZE_BY_HEIGHT: $this->resizeByHeight(); break;
       case self::ACTION_INSCRIBE: $this->inscribe(); break;
+      case self::ACTION_CROP_BY_WIDTH: $this->cropByWidth(); break;
       default: break;
     }
   }
