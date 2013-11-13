@@ -5,6 +5,8 @@ class Optimizer {
   const ACTION_RESIZE_BY_HEIGHT = 3;
   const ACTION_INSCRIBE = 4;
   const ACTION_CROP_BY_WIDTH = 5;
+  const ACTION_CROP_BY_HEIGHT = 6;
+  const ACTION_CROP = 7;
 
   private $optPathToCache = "cache";
   private $optDebugMode = false;
@@ -157,14 +159,23 @@ class Optimizer {
 
   /*** Crop By Width ***/
   function cropByWidth() {
-    $this->debugMsg("Вписывание с обрезанием по ширине");
+    $this->debugMsg("Вписывание с обрезанием сверху/снизу");
     $this->getSrcParams();
     $finalHeight = round($this->imgWidth / $this->srcRatio);
     $diff = round( ($this->imgHeight - $finalHeight) / 2 );
-    $this->debugMsg("finalH = ".$finalHeight);
-    $this->debugMsg("diff = ".$diff);
     $this->beforeImgTransform();
     imagecopyresampled($this->dstImg, $this->srcImg, 0, $diff, 0, 0, $this->imgWidth, $finalHeight, $this->srcWidth, $this->srcHeight);
+    $this->afterImgTransform();
+  }
+
+  /*** Crop By Height ***/
+  function cropByHeight() {
+    $this->debugMsg("Вписывание с обрезанием справа/слева");
+    $this->getSrcParams();
+    $finalWidth = round($this->imgHeight * $this->srcRatio);
+    $diff = round( ($this->imgWidth - $finalWidth) / 2 );
+    $this->beforeImgTransform();
+    imagecopyresampled($this->dstImg, $this->srcImg, $diff, 0, 0, 0, $finalWidth, $this->imgHeight, $this->srcWidth, $this->srcHeight);
     $this->afterImgTransform();
   }
 
@@ -238,6 +249,7 @@ class Optimizer {
       case self::ACTION_RESIZE_BY_HEIGHT: $this->resizeByHeight(); break;
       case self::ACTION_INSCRIBE: $this->inscribe(); break;
       case self::ACTION_CROP_BY_WIDTH: $this->cropByWidth(); break;
+      case self::ACTION_CROP_BY_HEIGHT: $this->cropByHeight(); break;
       default: break;
     }
   }
