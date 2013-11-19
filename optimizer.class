@@ -179,6 +179,17 @@ class Optimizer {
     $this->afterImgTransform();
   }
 
+  /*** Crop ***/
+  function crop() {
+    $this->debugMsg("Вписывание с обрезанием справа/слева");
+    $this->getSrcParams();
+    $finalHeight = round($this->imgWidth / $this->srcRatio);
+    if ( $finalHeight > $this->imgHeight )
+     $this->cropByWidth();
+    else
+     $this->cropByHeight();
+  }
+
   /********************************************* WATERMARKER *********************************************/
 
   function textWatermark($text) {
@@ -250,6 +261,7 @@ class Optimizer {
       case self::ACTION_INSCRIBE: $this->inscribe(); break;
       case self::ACTION_CROP_BY_WIDTH: $this->cropByWidth(); break;
       case self::ACTION_CROP_BY_HEIGHT: $this->cropByHeight(); break;
+      case self::ACTION_CROP: $this->crop(); break;
       default: break;
     }
   }
